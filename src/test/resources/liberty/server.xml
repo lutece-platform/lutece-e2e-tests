@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<server description="Lutece E2E Test Server">
+
+    <featureManager>
+        <feature>servlet-6.0</feature>
+        <feature>pages-3.1</feature>
+        <feature>jdbc-4.3</feature>
+        <feature>jndi-1.0</feature>
+        <feature>expressionLanguage-5.0</feature>
+        <feature>cdi-4.0</feature>
+        <feature>jsonb-3.0</feature>
+        <feature>restfulWS-3.1</feature>
+        <feature>mpConfig-3.1</feature>
+    </featureManager>
+
+    <!-- Endpoint HTTP -->
+    <httpEndpoint id="defaultHttpEndpoint"
+                  host="*"
+                  httpPort="9080"
+                  httpsPort="9443"/>
+
+    <!-- Variables d'environnement pour la configuration dynamique -->
+    <variable name="db.host" defaultValue="localhost"/>
+    <variable name="db.port" defaultValue="3306"/>
+    <variable name="db.name" defaultValue="lutece"/>
+    <variable name="db.user" defaultValue="lutece"/>
+    <variable name="db.password" defaultValue="lutece"/>
+
+    <!-- Datasource MariaDB/MySQL -->
+    <dataSource id="DefaultDataSource" jndiName="jdbc/lutece">
+        <jdbcDriver libraryRef="mariadbLib"/>
+        <properties.mysql serverName="${db.host}"
+                          portNumber="${db.port}"
+                          databaseName="${db.name}"
+                          user="${db.user}"
+                          password="${db.password}"/>
+    </dataSource>
+
+    <library id="mariadbLib">
+        <fileset dir="${server.config.dir}/lib" includes="*.jar"/>
+    </library>
+
+    <!-- Application Lutece -->
+    <webApplication id="lutece"
+                    contextRoot="/site-deontologie"
+                    location="site-deontologie.war">
+        <classloader apiTypeVisibility="spec,ibm-api,third-party"/>
+    </webApplication>
+
+    <!-- Logging -->
+    <logging consoleLogLevel="INFO"
+             traceSpecification="*=info:com.lutece.*=debug"/>
+
+    <!-- Securite - desactivee pour les tests -->
+    <webAppSecurity allowFailOverToBasicAuth="false"
+                    singleSignonEnabled="false"/>
+
+</server>
