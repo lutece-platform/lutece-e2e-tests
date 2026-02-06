@@ -291,7 +291,7 @@ pipeline {
                             // Utiliser JAVA_HOME dérivé du binaire java sur l'agent podman
                             sh """
                                 export JAVA_HOME=\$(dirname \$(dirname \$(readlink -f \$(which java))))
-                                ./mvnw test -o \
+                                ./mvnw test \
                                     -Dmaven.repo.local=m2-repo \
                                     -Dtest=${testClass} \
                                     -Dlutece.image=${params.LUTECE_IMAGE} \
@@ -341,7 +341,7 @@ pipeline {
 
                             sh """
                                 export JAVA_HOME=\$(dirname \$(dirname \$(readlink -f \$(which java))))
-                                ./mvnw test -o \
+                                ./mvnw test \
                                     -Dmaven.repo.local=m2-repo \
                                     -Dtest=${testClass} \
                                     -Dlutece.base.url=${env.TARGET_URL} \
