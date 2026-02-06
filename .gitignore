@@ -28,3 +28,6 @@ playwright/.cache/
 
 # Screenshots de test
 target/screenshots/
+
+# ia
+.claude
