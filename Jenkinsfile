@@ -31,10 +31,8 @@ pipeline {
         LUTECE_CONTEXT_ROOT = '/lutece'
         LUTECE_HTTP_PORT = '9090'
 
-        // Testcontainers avec Podman
+        // Testcontainers avec Podman - les valeurs exactes seront détectées dynamiquement
         TESTCONTAINERS_RYUK_DISABLED = 'true'
-        DOCKER_HOST = 'unix:///run/user/1000/podman/podman.sock'
-        TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE = '/run/user/1000/podman/podman.sock'
     }
 
     parameters {
@@ -177,16 +175,12 @@ pipeline {
                 }
 
                 stage('Install Playwright Browsers') {
+                    when {
+                        // Skip sur le contrôleur - sera fait sur l'agent Podman
+                        expression { false }
+                    }
                     steps {
-                        echo '=== Installation des navigateurs Playwright ==='
-                        withMaven(jdk: "${JAVA_MAVEN}", maven: "${MAVEN}", traceability: false) {
-                            sh '''
-                                mvn exec:java \
-                                    -e \
-                                    -Dexec.mainClass=com.microsoft.playwright.CLI \
-                                    -Dexec.args="install chromium"
-                            '''
-                        }
+                        echo '=== Installation des navigateurs Playwright (skipped - fait sur agent) ==='
                     }
                 }
 
@@ -267,6 +261,50 @@ pipeline {
                     }
                 }
 
+                stage('Install Playwright Browsers on Agent') {
+                    steps {
+                        echo '=== Installation des navigateurs Playwright sur l\'agent Podman ==='
+                        sh '''
+                            export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java))))
+                            export PLAYWRIGHT_BROWSERS_PATH=${WORKSPACE}/.playwright-browsers
+
+                            # Vérifier les dépendances système
+                            echo "=== Vérification des dépendances Playwright ==="
+                            MISSING_DEPS=""
+                            for lib in libnss3.so libnspr4.so libatk-1.0.so.0 libdrm.so.2 libxkbcommon.so.0; do
+                                if ! ldconfig -p 2>/dev/null | grep -q "$lib"; then
+                                    MISSING_DEPS="$MISSING_DEPS $lib"
+                                fi
+                            done
+
+                            if [ -n "$MISSING_DEPS" ]; then
+                                echo "ATTENTION: Dépendances manquantes détectées:$MISSING_DEPS"
+                                echo "Tentative d'installation avec --with-deps (nécessite sudo)..."
+                                ./mvnw exec:java -o \
+                                    -Dmaven.repo.local=m2-repo \
+                                    -Dexec.mainClass=com.microsoft.playwright.CLI \
+                                    -Dexec.args="install --with-deps chromium" \
+                                    -B || {
+                                    echo "ERREUR: Impossible d'installer les dépendances automatiquement."
+                                    echo "L'agent Jenkins doit avoir les packages suivants installés:"
+                                    echo "  libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2"
+                                    echo "  libdrm2 libxcb1 libxkbcommon0 libatspi2.0-0 libx11-6"
+                                    echo "  libxcomposite1 libxdamage1 libxext6 libxfixes3 libxrandr2"
+                                    echo "  libgbm1 libpango-1.0-0 libcairo2 libasound2"
+                                    exit 1
+                                }
+                            else
+                                echo "Dépendances système OK"
+                                ./mvnw exec:java -o \
+                                    -Dmaven.repo.local=m2-repo \
+                                    -Dexec.mainClass=com.microsoft.playwright.CLI \
+                                    -Dexec.args="install chromium" \
+                                    -B
+                            fi
+                        '''
+                    }
+                }
+
                 stage('Run E2E Tests - Testcontainers') {
                     when {
                         expression { params.TEST_MODE == 'TESTCONTAINERS' }
@@ -294,9 +332,20 @@ pipeline {
 
                             sh 'mkdir -p target/screenshots'
 
-                            // Utiliser JAVA_HOME dérivé du binaire java sur l'agent podman
+                            // Détecter le socket Podman dynamiquement et configurer Testcontainers
                             sh """
                                 export JAVA_HOME=\$(dirname \$(dirname \$(readlink -f \$(which java))))
+                                export PLAYWRIGHT_BROWSERS_PATH=\${WORKSPACE}/.playwright-browsers
+
+                                # Détecter le socket Podman
+                                PODMAN_SOCKET=\$(podman info --format '{{.Host.RemoteSocket.Path}}')
+                                echo "Socket Podman détecté: \$PODMAN_SOCKET"
+
+                                # Configurer Testcontainers pour Podman
+                                export DOCKER_HOST="unix://\$PODMAN_SOCKET"
+                                export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE="\$PODMAN_SOCKET"
+                                export TESTCONTAINERS_RYUK_DISABLED=true
+
                                 ./mvnw test -o \
                                     -Dmaven.repo.local=m2-repo \
                                     -Dtest=${testClass} \
@@ -347,6 +396,8 @@ pipeline {
 
                             sh """
                                 export JAVA_HOME=\$(dirname \$(dirname \$(readlink -f \$(which java))))
+                                export PLAYWRIGHT_BROWSERS_PATH=\${WORKSPACE}/.playwright-browsers
+
                                 ./mvnw test -o \
                                     -Dmaven.repo.local=m2-repo \
                                     -Dtest=${testClass} \
