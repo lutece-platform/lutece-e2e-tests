@@ -156,14 +156,14 @@ pipeline {
                         echo '=== Installation des dépendances Maven ==='
                         withMaven(jdk: "${JAVA_MAVEN}", maven: "${MAVEN}", traceability: false) {
                             sh '''
-                                mvn clean install -DskipTests -B -q
+                                # Forcer le local repository dans le workspace pour le stash
+                                mvn clean install -DskipTests -Dmaven.repo.local=.m2/repository -B -q
+                                # Télécharger TOUT pour le mode offline
+                                mvn dependency:go-offline -Dmaven.repo.local=.m2/repository -B
+                                # Initialiser le Maven Wrapper
+                                ./mvnw -Dmaven.repo.local=.m2/repository --version
                             '''
                         }
-                        // Utiliser le Maven Wrapper pour go-offline afin d'assurer
-                        // que les plugins sont dans le même local repo que celui utilisé sur podman
-                        sh '''
-                            ./mvnw dependency:go-offline -B
-                        '''
                     }
                 }
 
