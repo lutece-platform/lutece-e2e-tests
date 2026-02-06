@@ -129,9 +129,8 @@ pipeline {
                         java -version
                         echo "JAVA_HOME: $JAVA_HOME"
 
-                        echo "Maven Wrapper:"
-                        chmod +x ./mvnw
-                        ./mvnw -version
+                        echo "Maven:"
+                        mvn -version
 
                         echo "Podman:"
                         podman --version
@@ -203,7 +202,7 @@ pipeline {
             steps {
                 echo '=== Installation des dépendances Maven ==='
                 withMaven(jdk: "${JAVA_MAVEN}", maven: "${MAVEN}", traceability: false) {
-                    sh './mvnw clean install -DskipTests -B -q'
+                    sh 'mvn clean install -DskipTests -B -q'
                 }
             }
         }
@@ -213,7 +212,7 @@ pipeline {
                 echo '=== Installation des navigateurs Playwright ==='
                 withMaven(jdk: "${JAVA_MAVEN}", maven: "${MAVEN}", traceability: false) {
                     sh '''
-                        ./mvnw exec:java \
+                        mvn exec:java \
                             -e \
                             -Dexec.mainClass=com.microsoft.playwright.CLI \
                             -Dexec.args="install chromium --with-deps"
@@ -252,7 +251,7 @@ pipeline {
 
                     withMaven(jdk: "${JAVA_MAVEN}", maven: "${MAVEN}", traceability: false) {
                         sh """
-                            ./mvnw test \
+                            mvn test \
                                 -Dtest=${testClass} \
                                 -Dlutece.image=${params.LUTECE_IMAGE} \
                                 -Dlutece.context.root=${LUTECE_CONTEXT_ROOT} \
@@ -303,7 +302,7 @@ pipeline {
 
                     withMaven(jdk: "${JAVA_MAVEN}", maven: "${MAVEN}", traceability: false) {
                         sh """
-                            ./mvnw test \
+                            mvn test \
                                 -Dtest=${testClass} \
                                 -Dlutece.base.url=${env.TARGET_URL} \
                                 -Dtest.headless=${params.HEADLESS} \
@@ -338,7 +337,7 @@ pipeline {
                 withSonarQubeEnv('SonarQube') {
                     withMaven(jdk: "${JAVA_MAVEN}", maven: "${MAVEN}", traceability: false) {
                         sh """
-                            ./mvnw sonar:sonar \
+                            mvn sonar:sonar \
                                 -Dsonar.projectKey=lutece-e2e-tests \
                                 -Dsonar.projectName='Lutece E2E Tests' \
                                 -Dsonar.sources=src/test/java \
