@@ -160,6 +160,8 @@ pipeline {
                                 mvn clean install -DskipTests -Dmaven.repo.local=.m2/repository -B -q
                                 # Télécharger TOUT pour le mode offline
                                 mvn dependency:go-offline -Dmaven.repo.local=.m2/repository -B
+                                # Forcer le téléchargement explicite des plugins de test
+                                mvn surefire:help failsafe:help -Dmaven.repo.local=.m2/repository -B -q
                                 # Initialiser le Maven Wrapper
                                 ./mvnw -Dmaven.repo.local=.m2/repository --version
                             '''
