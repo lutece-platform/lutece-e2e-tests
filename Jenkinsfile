@@ -163,7 +163,7 @@ pipeline {
                                 # Forcer le téléchargement explicite des plugins de test
                                 mvn surefire:help failsafe:help -Dmaven.repo.local=m2-repo -B -q
                                 # Déclencher le téléchargement des providers JUnit Platform (chargés dynamiquement par surefire)
-                                mvn test -Dtest=NonExistentTest -DfailIfNoTests=false -Dmaven.repo.local=m2-repo -B -q || true
+                                mvn test -Dtest=NonExistentTest -Dsurefire.failIfNoSpecifiedTests=false -Dmaven.repo.local=m2-repo -B -q || true
                                 # Initialiser le Maven Wrapper
                                 ./mvnw -Dmaven.repo.local=m2-repo --version
                             '''
