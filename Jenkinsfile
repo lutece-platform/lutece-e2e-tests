@@ -162,8 +162,10 @@ pipeline {
                                 mvn dependency:go-offline -Dmaven.repo.local=m2-repo -B
                                 # Forcer le téléchargement explicite des plugins de test
                                 mvn surefire:help failsafe:help -Dmaven.repo.local=m2-repo -B -q
-                                # Déclencher le téléchargement des providers JUnit Platform (chargés dynamiquement par surefire)
-                                mvn test -Dtest=NonExistentTest -Dsurefire.failIfNoSpecifiedTests=false -Dmaven.repo.local=m2-repo -B -q || true
+                                # Télécharger explicitement les providers JUnit Platform (chargés dynamiquement par surefire)
+                                mvn dependency:get -Dartifact=org.apache.maven.surefire:surefire-junit-platform:3.2.5 -Dtransitive=true -Dmaven.repo.local=m2-repo -B
+                                mvn dependency:get -Dartifact=org.apache.maven.surefire:surefire-booter:3.2.5 -Dtransitive=true -Dmaven.repo.local=m2-repo -B
+                                mvn dependency:get -Dartifact=org.apache.maven.surefire:surefire-api:3.2.5 -Dtransitive=true -Dmaven.repo.local=m2-repo -B
                                 # Initialiser le Maven Wrapper
                                 ./mvnw -Dmaven.repo.local=m2-repo --version
                             '''
