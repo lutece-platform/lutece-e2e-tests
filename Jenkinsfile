@@ -16,7 +16,6 @@ pipeline {
     }
 
     tools {
-        maven 'Maven 3.8.5'
         jdk 'temurin-17-jdk'
     }
 
@@ -130,13 +129,14 @@ pipeline {
                     echo "Java:"
                     java -version
 
+                    echo "Maven Wrapper:"
+                    chmod +x ./mvnw
+                    ./mvnw -version
+
                     echo "Podman:"
                     podman --version
                     podman info --format '{{.Host.RemoteSocket.Path}}'
                 '''
-                withMaven(jdk: 'temurin-17-jdk', maven: 'Maven 3.8.5') {
-                    sh 'echo "Maven:" && mvn -version'
-                }
             }
         }
 
@@ -201,23 +201,19 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 echo '=== Installation des dépendances Maven ==='
-                withMaven(jdk: 'temurin-17-jdk', maven: 'Maven 3.8.5') {
-                    sh 'mvn clean install -DskipTests -B -q'
-                }
+                sh './mvnw clean install -DskipTests -B -q'
             }
         }
 
         stage('Install Playwright Browsers') {
             steps {
                 echo '=== Installation des navigateurs Playwright ==='
-                withMaven(jdk: 'temurin-17-jdk', maven: 'Maven 3.8.5') {
-                    sh '''
-                        mvn exec:java \
-                            -e \
-                            -Dexec.mainClass=com.microsoft.playwright.CLI \
-                            -Dexec.args="install chromium --with-deps"
-                    '''
-                }
+                sh '''
+                    ./mvnw exec:java \
+                        -e \
+                        -Dexec.mainClass=com.microsoft.playwright.CLI \
+                        -Dexec.args="install chromium --with-deps"
+                '''
             }
         }
 
@@ -249,19 +245,17 @@ pipeline {
 
                     sh 'mkdir -p target/screenshots'
 
-                    withMaven(jdk: 'temurin-17-jdk', maven: 'Maven 3.8.5') {
-                        sh """
-                            mvn test \
-                                -Dtest=${testClass} \
-                                -Dlutece.image=${params.LUTECE_IMAGE} \
-                                -Dlutece.context.root=${LUTECE_CONTEXT_ROOT} \
-                                -Dlutece.http.port=${LUTECE_HTTP_PORT} \
-                                -Dtest.headless=${params.HEADLESS} \
-                                -Dtest.timeout=30000 \
-                                -B \
-                                --fail-at-end
-                        """
-                    }
+                    sh """
+                        ./mvnw test \
+                            -Dtest=${testClass} \
+                            -Dlutece.image=${params.LUTECE_IMAGE} \
+                            -Dlutece.context.root=${LUTECE_CONTEXT_ROOT} \
+                            -Dlutece.http.port=${LUTECE_HTTP_PORT} \
+                            -Dtest.headless=${params.HEADLESS} \
+                            -Dtest.timeout=30000 \
+                            -B \
+                            --fail-at-end
+                    """
                 }
             }
             post {
@@ -300,17 +294,15 @@ pipeline {
 
                     sh 'mkdir -p target/screenshots'
 
-                    withMaven(jdk: 'temurin-17-jdk', maven: 'Maven 3.8.5') {
-                        sh """
-                            mvn test \
-                                -Dtest=${testClass} \
-                                -Dlutece.base.url=${env.TARGET_URL} \
-                                -Dtest.headless=${params.HEADLESS} \
-                                -Dtest.timeout=10000 \
-                                -B \
-                                --fail-at-end
-                        """
-                    }
+                    sh """
+                        ./mvnw test \
+                            -Dtest=${testClass} \
+                            -Dlutece.base.url=${env.TARGET_URL} \
+                            -Dtest.headless=${params.HEADLESS} \
+                            -Dtest.timeout=10000 \
+                            -B \
+                            --fail-at-end
+                    """
                 }
             }
             post {
@@ -335,19 +327,17 @@ pipeline {
                 '''
 
                 withSonarQubeEnv('SonarQube') {
-                    withMaven(jdk: 'temurin-17-jdk', maven: 'Maven 3.8.5') {
-                        sh """
-                            mvn sonar:sonar \
-                                -Dsonar.projectKey=lutece-e2e-tests \
-                                -Dsonar.projectName='Lutece E2E Tests' \
-                                -Dsonar.sources=src/test/java \
-                                -Dsonar.tests=src/test/java \
-                                -Dsonar.java.binaries=target/test-classes \
-                                -Dsonar.junit.reportPaths=target/surefire-reports \
-                                -Dsonar.qualitygate.wait=false \
-                                -B
-                        """
-                    }
+                    sh """
+                        ./mvnw sonar:sonar \
+                            -Dsonar.projectKey=lutece-e2e-tests \
+                            -Dsonar.projectName='Lutece E2E Tests' \
+                            -Dsonar.sources=src/test/java \
+                            -Dsonar.tests=src/test/java \
+                            -Dsonar.java.binaries=target/test-classes \
+                            -Dsonar.junit.reportPaths=target/surefire-reports \
+                            -Dsonar.qualitygate.wait=false \
+                            -B
+                    """
                 }
             }
         }
