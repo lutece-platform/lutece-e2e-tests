@@ -154,7 +154,12 @@ pipeline {
                     steps {
                         echo '=== Installation des dépendances Maven ==='
                         withMaven(jdk: "${JAVA_MAVEN}", maven: "${MAVEN}", traceability: false) {
-                            sh 'mvn clean install -DskipTests -B -q'
+                            sh '''
+                                mvn clean install -DskipTests -B -q
+                                # Télécharger tous les plugins (y compris ceux de test) pour le mode offline
+                                mvn dependency:resolve-plugins -B -q
+                                mvn test-compile -B -q
+                            '''
                         }
                     }
                 }
