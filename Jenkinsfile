@@ -274,7 +274,7 @@ pipeline {
                             sh """
                                 export JAVA_HOME=\$(dirname \$(dirname \$(readlink -f \$(which java))))
                                 ./mvnw test -o \
-                                    -Daether.enhancedLocalRepository.split=false \
+                                    -Dmaven.repo.local=.m2/repository \
                                     -Dtest=${testClass} \
                                     -Dlutece.image=${params.LUTECE_IMAGE} \
                                     -Dlutece.context.root=${LUTECE_CONTEXT_ROOT} \
@@ -324,7 +324,7 @@ pipeline {
                             sh """
                                 export JAVA_HOME=\$(dirname \$(dirname \$(readlink -f \$(which java))))
                                 ./mvnw test -o \
-                                    -Daether.enhancedLocalRepository.split=false \
+                                    -Dmaven.repo.local=.m2/repository \
                                     -Dtest=${testClass} \
                                     -Dlutece.base.url=${env.TARGET_URL} \
                                     -Dtest.headless=${params.HEADLESS} \
