@@ -74,11 +74,9 @@ pipeline {
     }
 
     environment {
-        // Java
-        JAVA_HOME = tool 'temurin-17-jdk'
-        PATH = "${JAVA_HOME}/bin:${env.PATH}"
-
-        // Maven
+        // Java / Maven
+        JAVA_MAVEN = 'temurin-17-jdk'
+        MAVEN = 'Maven 3.8.5'
         MAVEN_OPTS = '-Dmaven.repo.local=.m2/repository'
 
         // Playwright
@@ -125,18 +123,21 @@ pipeline {
         stage('Verify Environment') {
             steps {
                 echo '=== Vérification de l\'environnement ==='
-                sh '''
-                    echo "Java:"
-                    java -version
+                withMaven(jdk: "${JAVA_MAVEN}", maven: "${MAVEN}", traceability: false) {
+                    sh '''
+                        echo "Java:"
+                        java -version
+                        echo "JAVA_HOME: $JAVA_HOME"
 
-                    echo "Maven Wrapper:"
-                    chmod +x ./mvnw
-                    ./mvnw -version
+                        echo "Maven Wrapper:"
+                        chmod +x ./mvnw
+                        ./mvnw -version
 
-                    echo "Podman:"
-                    podman --version
-                    podman info --format '{{.Host.RemoteSocket.Path}}'
-                '''
+                        echo "Podman:"
+                        podman --version
+                        podman info --format '{{.Host.RemoteSocket.Path}}'
+                    '''
+                }
             }
         }
 
@@ -201,19 +202,23 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 echo '=== Installation des dépendances Maven ==='
-                sh './mvnw clean install -DskipTests -B -q'
+                withMaven(jdk: "${JAVA_MAVEN}", maven: "${MAVEN}", traceability: false) {
+                    sh './mvnw clean install -DskipTests -B -q'
+                }
             }
         }
 
         stage('Install Playwright Browsers') {
             steps {
                 echo '=== Installation des navigateurs Playwright ==='
-                sh '''
-                    ./mvnw exec:java \
-                        -e \
-                        -Dexec.mainClass=com.microsoft.playwright.CLI \
-                        -Dexec.args="install chromium --with-deps"
-                '''
+                withMaven(jdk: "${JAVA_MAVEN}", maven: "${MAVEN}", traceability: false) {
+                    sh '''
+                        ./mvnw exec:java \
+                            -e \
+                            -Dexec.mainClass=com.microsoft.playwright.CLI \
+                            -Dexec.args="install chromium --with-deps"
+                    '''
+                }
             }
         }
 
@@ -245,17 +250,19 @@ pipeline {
 
                     sh 'mkdir -p target/screenshots'
 
-                    sh """
-                        ./mvnw test \
-                            -Dtest=${testClass} \
-                            -Dlutece.image=${params.LUTECE_IMAGE} \
-                            -Dlutece.context.root=${LUTECE_CONTEXT_ROOT} \
-                            -Dlutece.http.port=${LUTECE_HTTP_PORT} \
-                            -Dtest.headless=${params.HEADLESS} \
-                            -Dtest.timeout=30000 \
-                            -B \
-                            --fail-at-end
-                    """
+                    withMaven(jdk: "${JAVA_MAVEN}", maven: "${MAVEN}", traceability: false) {
+                        sh """
+                            ./mvnw test \
+                                -Dtest=${testClass} \
+                                -Dlutece.image=${params.LUTECE_IMAGE} \
+                                -Dlutece.context.root=${LUTECE_CONTEXT_ROOT} \
+                                -Dlutece.http.port=${LUTECE_HTTP_PORT} \
+                                -Dtest.headless=${params.HEADLESS} \
+                                -Dtest.timeout=30000 \
+                                -B \
+                                --fail-at-end
+                        """
+                    }
                 }
             }
             post {
@@ -294,15 +301,17 @@ pipeline {
 
                     sh 'mkdir -p target/screenshots'
 
-                    sh """
-                        ./mvnw test \
-                            -Dtest=${testClass} \
-                            -Dlutece.base.url=${env.TARGET_URL} \
-                            -Dtest.headless=${params.HEADLESS} \
-                            -Dtest.timeout=10000 \
-                            -B \
-                            --fail-at-end
-                    """
+                    withMaven(jdk: "${JAVA_MAVEN}", maven: "${MAVEN}", traceability: false) {
+                        sh """
+                            ./mvnw test \
+                                -Dtest=${testClass} \
+                                -Dlutece.base.url=${env.TARGET_URL} \
+                                -Dtest.headless=${params.HEADLESS} \
+                                -Dtest.timeout=10000 \
+                                -B \
+                                --fail-at-end
+                        """
+                    }
                 }
             }
             post {
@@ -327,17 +336,19 @@ pipeline {
                 '''
 
                 withSonarQubeEnv('SonarQube') {
-                    sh """
-                        ./mvnw sonar:sonar \
-                            -Dsonar.projectKey=lutece-e2e-tests \
-                            -Dsonar.projectName='Lutece E2E Tests' \
-                            -Dsonar.sources=src/test/java \
-                            -Dsonar.tests=src/test/java \
-                            -Dsonar.java.binaries=target/test-classes \
-                            -Dsonar.junit.reportPaths=target/surefire-reports \
-                            -Dsonar.qualitygate.wait=false \
-                            -B
-                    """
+                    withMaven(jdk: "${JAVA_MAVEN}", maven: "${MAVEN}", traceability: false) {
+                        sh """
+                            ./mvnw sonar:sonar \
+                                -Dsonar.projectKey=lutece-e2e-tests \
+                                -Dsonar.projectName='Lutece E2E Tests' \
+                                -Dsonar.sources=src/test/java \
+                                -Dsonar.tests=src/test/java \
+                                -Dsonar.java.binaries=target/test-classes \
+                                -Dsonar.junit.reportPaths=target/surefire-reports \
+                                -Dsonar.qualitygate.wait=false \
+                                -B
+                        """
+                    }
                 }
             }
         }
