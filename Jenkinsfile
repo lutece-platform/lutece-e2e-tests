@@ -15,10 +15,6 @@ pipeline {
         label 'podman'  // Agent avec Podman disponible
     }
 
-    tools {
-        jdk 'temurin-17-jdk'
-    }
-
     parameters {
         // Mode d'exécution
         choice(
@@ -78,6 +74,10 @@ pipeline {
     }
 
     environment {
+        // Java
+        JAVA_HOME = tool 'temurin-17-jdk'
+        PATH = "${JAVA_HOME}/bin:${env.PATH}"
+
         // Maven
         MAVEN_OPTS = '-Dmaven.repo.local=.m2/repository'
 
