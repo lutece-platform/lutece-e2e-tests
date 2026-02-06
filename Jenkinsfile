@@ -18,6 +18,7 @@ pipeline {
         JAVA_MAVEN = 'temurin-17-jdk'
         MAVEN = 'Maven 3.8.5'
         MAVEN_OPTS = '-Dmaven.repo.local=.m2/repository'
+        MAVEN_USER_HOME = '.m2'  // Pour que le wrapper télécharge Maven dans le workspace
 
         // Playwright
         PLAYWRIGHT_BROWSERS_PATH = '.playwright-browsers'
@@ -159,6 +160,8 @@ pipeline {
                                 # Télécharger tous les plugins (y compris ceux de test) pour le mode offline
                                 mvn dependency:resolve-plugins -B -q
                                 mvn test-compile -B -q
+                                # Initialiser le Maven Wrapper pour télécharger la distribution Maven
+                                ./mvnw --version
                             '''
                         }
                     }
