@@ -159,20 +159,6 @@ pipeline {
                     }
                 }
 
-                stage('Install Playwright Browsers') {
-                    steps {
-                        echo '=== Installation des navigateurs Playwright ==='
-                        withMaven(jdk: "${JAVA_MAVEN}", maven: "${MAVEN}", traceability: false) {
-                            sh '''
-                                mvn exec:java \
-                                    -e \
-                                    -Dexec.mainClass=com.microsoft.playwright.CLI \
-                                    -Dexec.args="install chromium --with-deps"
-                            '''
-                        }
-                    }
-                }
-
                 stage('Stash Artifacts') {
                     steps {
                         echo '=== Préparation des artefacts pour l\'agent Podman ==='
@@ -198,6 +184,19 @@ pipeline {
                             echo "Podman:"
                             podman --version
                             podman info --format '{{.Host.RemoteSocket.Path}}'
+                        '''
+                    }
+                }
+
+                stage('Install Playwright Browsers') {
+                    steps {
+                        echo '=== Installation des navigateurs Playwright ==='
+                        sh '''
+                            export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java))))
+                            ./mvnw exec:java \
+                                -e \
+                                -Dexec.mainClass=com.microsoft.playwright.CLI \
+                                -Dexec.args="install chromium"
                         '''
                     }
                 }
