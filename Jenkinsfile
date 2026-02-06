@@ -205,6 +205,16 @@ pipeline {
                 stage('Unstash Workspace') {
                     steps {
                         unstash 'workspace-stash'
+                        // Debug: vérifier que m2-repo est bien présent après unstash
+                        sh '''
+                            echo "=== Vérification m2-repo sur podman agent ==="
+                            echo "PWD: $(pwd)"
+                            ls -la | head -20
+                            echo "=== Contenu m2-repo ==="
+                            ls -la m2-repo/ | head -10 || echo "ERREUR: m2-repo n'existe pas!"
+                            echo "=== Vérification failsafe-plugin ==="
+                            ls -la m2-repo/org/apache/maven/plugins/maven-failsafe-plugin/3.2.5/ || echo "ERREUR: failsafe-plugin introuvable!"
+                        '''
                     }
                 }
 
