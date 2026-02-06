@@ -17,7 +17,7 @@ pipeline {
         // Java / Maven
         JAVA_MAVEN = 'temurin-17-jdk'
         MAVEN = 'Maven 3.8.5'
-        MAVEN_OPTS = '-Dmaven.repo.local=.m2/repository'
+        MAVEN_OPTS = '-Dmaven.repo.local=m2-repo'
         MAVEN_USER_HOME = '.m2'  // Pour que le wrapper télécharge Maven dans le workspace
 
         // Playwright
@@ -157,13 +157,13 @@ pipeline {
                         withMaven(jdk: "${JAVA_MAVEN}", maven: "${MAVEN}", traceability: false) {
                             sh '''
                                 # Forcer le local repository dans le workspace pour le stash
-                                mvn clean install -DskipTests -Dmaven.repo.local=.m2/repository -B -q
+                                mvn clean install -DskipTests -Dmaven.repo.local=m2-repo -B -q
                                 # Télécharger TOUT pour le mode offline
-                                mvn dependency:go-offline -Dmaven.repo.local=.m2/repository -B
+                                mvn dependency:go-offline -Dmaven.repo.local=m2-repo -B
                                 # Forcer le téléchargement explicite des plugins de test
-                                mvn surefire:help failsafe:help -Dmaven.repo.local=.m2/repository -B -q
+                                mvn surefire:help failsafe:help -Dmaven.repo.local=m2-repo -B -q
                                 # Initialiser le Maven Wrapper
-                                ./mvnw -Dmaven.repo.local=.m2/repository --version
+                                ./mvnw -Dmaven.repo.local=m2-repo --version
                             '''
                         }
                     }
@@ -186,15 +186,14 @@ pipeline {
                 stage('Stash Artifacts') {
                     steps {
                         echo '=== Préparation des artefacts pour l\'agent Podman ==='
-                        // Debug: vérifier le contenu de .m2
+                        // Debug: vérifier le contenu de m2-repo
                         sh '''
-                            echo "=== Vérification .m2/repository ==="
-                            ls -la .m2/ || echo ".m2 n'existe pas"
-                            ls -la .m2/repository/ | head -20 || echo ".m2/repository n'existe pas"
-                            find .m2/repository -name "maven-failsafe-plugin*" 2>/dev/null || echo "failsafe plugin non trouvé"
+                            echo "=== Vérification m2-repo ==="
+                            ls -la m2-repo/ | head -20 || echo "m2-repo n'existe pas"
+                            find m2-repo -name "maven-failsafe-plugin*" 2>/dev/null || echo "failsafe plugin non trouvé"
                         '''
-                        // Inclure explicitement les répertoires cachés .m2 et .mvn
-                        stash includes: '**, .m2/**, .mvn/**', excludes: '.git/**', name: 'workspace-stash', useDefaultExcludes: false
+                        // m2-repo (sans le point) sera inclus normalement par **
+                        stash includes: '**', excludes: '.git/**', name: 'workspace-stash'
                     }
                 }
             }
@@ -283,7 +282,7 @@ pipeline {
                             sh """
                                 export JAVA_HOME=\$(dirname \$(dirname \$(readlink -f \$(which java))))
                                 ./mvnw test -o \
-                                    -Dmaven.repo.local=.m2/repository \
+                                    -Dmaven.repo.local=m2-repo \
                                     -Dtest=${testClass} \
                                     -Dlutece.image=${params.LUTECE_IMAGE} \
                                     -Dlutece.context.root=${LUTECE_CONTEXT_ROOT} \
@@ -333,7 +332,7 @@ pipeline {
                             sh """
                                 export JAVA_HOME=\$(dirname \$(dirname \$(readlink -f \$(which java))))
                                 ./mvnw test -o \
-                                    -Dmaven.repo.local=.m2/repository \
+                                    -Dmaven.repo.local=m2-repo \
                                     -Dtest=${testClass} \
                                     -Dlutece.base.url=${env.TARGET_URL} \
                                     -Dtest.headless=${params.HEADLESS} \
