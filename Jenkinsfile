@@ -188,7 +188,8 @@ pipeline {
                         echo '=== Préparation des artefacts pour l\'agent Podman ==='
                         // Inclure le workspace, les navigateurs Playwright et le repo Maven local
                         // useDefaultExcludes: false pour inclure les répertoires cachés (.m2, .mvn, etc.)
-                        stash includes: '**', name: 'workspace-stash', useDefaultExcludes: false
+                        // Exclure .git pour éviter les conflits de permissions
+                        stash includes: '**', excludes: '.git/**', name: 'workspace-stash', useDefaultExcludes: false
                     }
                 }
             }
