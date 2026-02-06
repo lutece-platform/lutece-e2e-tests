@@ -157,12 +157,13 @@ pipeline {
                         withMaven(jdk: "${JAVA_MAVEN}", maven: "${MAVEN}", traceability: false) {
                             sh '''
                                 mvn clean install -DskipTests -B -q
-                                # Télécharger TOUT pour le mode offline (dépendances + plugins)
-                                mvn dependency:go-offline -B
-                                # Initialiser le Maven Wrapper pour télécharger la distribution Maven
-                                ./mvnw --version
                             '''
                         }
+                        // Utiliser le Maven Wrapper pour go-offline afin d'assurer
+                        // que les plugins sont dans le même local repo que celui utilisé sur podman
+                        sh '''
+                            ./mvnw dependency:go-offline -B
+                        '''
                     }
                 }
 
