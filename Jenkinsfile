@@ -205,14 +205,12 @@ pipeline {
                 stage('Unstash Workspace') {
                     steps {
                         unstash 'workspace-stash'
-                        // Debug: vérifier que m2-repo est bien présent après unstash
+                        // Supprimer les fichiers _remote.repositories pour forcer Maven à utiliser le cache local
+                        // Sans cela, Maven essaie de valider les artifacts avec le dépôt distant
                         sh '''
-                            echo "=== Vérification m2-repo sur podman agent ==="
-                            echo "PWD: $(pwd)"
-                            ls -la | head -20
-                            echo "=== Contenu m2-repo ==="
-                            ls -la m2-repo/ | head -10 || echo "ERREUR: m2-repo n'existe pas!"
-                            echo "=== Vérification failsafe-plugin ==="
+                            echo "=== Nettoyage des métadonnées remote repositories ==="
+                            find m2-repo -name "_remote.repositories" -delete
+                            echo "=== Vérification m2-repo ==="
                             ls -la m2-repo/org/apache/maven/plugins/maven-failsafe-plugin/3.2.5/ || echo "ERREUR: failsafe-plugin introuvable!"
                         '''
                     }
@@ -291,7 +289,7 @@ pipeline {
                             // Utiliser JAVA_HOME dérivé du binaire java sur l'agent podman
                             sh """
                                 export JAVA_HOME=\$(dirname \$(dirname \$(readlink -f \$(which java))))
-                                ./mvnw test \
+                                ./mvnw test -o \
                                     -Dmaven.repo.local=m2-repo \
                                     -Dtest=${testClass} \
                                     -Dlutece.image=${params.LUTECE_IMAGE} \
@@ -341,7 +339,7 @@ pipeline {
 
                             sh """
                                 export JAVA_HOME=\$(dirname \$(dirname \$(readlink -f \$(which java))))
-                                ./mvnw test \
+                                ./mvnw test -o \
                                     -Dmaven.repo.local=m2-repo \
                                     -Dtest=${testClass} \
                                     -Dlutece.base.url=${env.TARGET_URL} \
