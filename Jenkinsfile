@@ -162,6 +162,8 @@ pipeline {
                                 mvn dependency:go-offline -Dmaven.repo.local=m2-repo -B
                                 # Forcer le téléchargement explicite des plugins de test
                                 mvn surefire:help failsafe:help -Dmaven.repo.local=m2-repo -B -q
+                                # Déclencher le téléchargement des providers JUnit Platform (chargés dynamiquement par surefire)
+                                mvn test -Dtest=NonExistentTest -DfailIfNoTests=false -Dmaven.repo.local=m2-repo -B -q || true
                                 # Initialiser le Maven Wrapper
                                 ./mvnw -Dmaven.repo.local=m2-repo --version
                             '''
@@ -205,13 +207,14 @@ pipeline {
                 stage('Unstash Workspace') {
                     steps {
                         unstash 'workspace-stash'
-                        // Supprimer les fichiers _remote.repositories pour forcer Maven à utiliser le cache local
-                        // Sans cela, Maven essaie de valider les artifacts avec le dépôt distant
+                        // Supprimer les fichiers de métadonnées qui empêchent le mode offline
                         sh '''
-                            echo "=== Nettoyage des métadonnées remote repositories ==="
+                            echo "=== Nettoyage des métadonnées ==="
                             find m2-repo -name "_remote.repositories" -delete
+                            find m2-repo -name "*.lastUpdated" -delete
                             echo "=== Vérification m2-repo ==="
                             ls -la m2-repo/org/apache/maven/plugins/maven-failsafe-plugin/3.2.5/ || echo "ERREUR: failsafe-plugin introuvable!"
+                            ls -la m2-repo/org/apache/maven/surefire/surefire-junit-platform/3.2.5/ || echo "ERREUR: surefire-junit-platform introuvable!"
                         '''
                     }
                 }
