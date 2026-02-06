@@ -97,9 +97,6 @@ pipeline {
         TESTCONTAINERS_RYUK_DISABLED = 'true'
         DOCKER_HOST = 'unix:///run/user/1000/podman/podman.sock'
         TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE = '/run/user/1000/podman/podman.sock'
-
-        // SonarQube
-        SONAR_SCANNER_HOME = tool 'SonarScanner'
     }
 
     options {
@@ -133,13 +130,13 @@ pipeline {
                     echo "Java:"
                     java -version
 
-                    echo "Maven:"
-                    mvn -version
-
                     echo "Podman:"
                     podman --version
                     podman info --format '{{.Host.RemoteSocket.Path}}'
                 '''
+                withMaven(jdk: 'temurin-17-jdk', maven: 'Maven 3.8.5') {
+                    sh 'echo "Maven:" && mvn -version'
+                }
             }
         }
 
