@@ -186,6 +186,13 @@ pipeline {
                 stage('Stash Artifacts') {
                     steps {
                         echo '=== Préparation des artefacts pour l\'agent Podman ==='
+                        // Debug: vérifier le contenu de .m2
+                        sh '''
+                            echo "=== Vérification .m2/repository ==="
+                            ls -la .m2/ || echo ".m2 n'existe pas"
+                            ls -la .m2/repository/ | head -20 || echo ".m2/repository n'existe pas"
+                            find .m2/repository -name "maven-failsafe-plugin*" 2>/dev/null || echo "failsafe plugin non trouvé"
+                        '''
                         // Inclure explicitement les répertoires cachés .m2 et .mvn
                         stash includes: '**, .m2/**, .mvn/**', excludes: '.git/**', name: 'workspace-stash', useDefaultExcludes: false
                     }
