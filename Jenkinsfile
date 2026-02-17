@@ -214,7 +214,22 @@ pipeline {
                         sh '''
                             echo "Podman:"
                             podman --version
-                            podman info --format '{{.Host.RemoteSocket.Path}}'
+
+                            # Démarrer le service socket Podman pour exposer l'API via un fichier socket
+                            # Nécessaire pour monter le socket dans le conteneur Playwright
+                            PODMAN_SOCKET="${XDG_RUNTIME_DIR:-/tmp/storage-run-$(id -u)}/podman/podman.sock"
+                            if [ ! -S "$PODMAN_SOCKET" ]; then
+                                echo "Démarrage du service socket Podman..."
+                                # Tenter via systemd, sinon démarrer manuellement
+                                systemctl --user start podman.socket 2>/dev/null || {
+                                    mkdir -p "$(dirname $PODMAN_SOCKET)"
+                                    podman system service -t 0 "unix://$PODMAN_SOCKET" &
+                                    sleep 2
+                                }
+                            fi
+
+                            echo "Socket Podman: $PODMAN_SOCKET"
+                            ls -la "$PODMAN_SOCKET" || { echo "ERREUR: socket Podman introuvable"; exit 1; }
                         '''
                     }
                 }
@@ -284,8 +299,8 @@ pipeline {
                             // Exécuter les tests dans le conteneur Playwright
                             // Le conteneur a Chromium + toutes les dépendances système pré-installées
                             sh """
-                                PODMAN_SOCKET=\$(podman info --format '{{.Host.RemoteSocket.Path}}')
-                                echo "Socket Podman détecté: \$PODMAN_SOCKET"
+                                PODMAN_SOCKET="\${XDG_RUNTIME_DIR:-/tmp/storage-run-\$(id -u)}/podman/podman.sock"
+                                echo "Socket Podman: \$PODMAN_SOCKET"
 
                                 podman run --rm \
                                     --network=host \
