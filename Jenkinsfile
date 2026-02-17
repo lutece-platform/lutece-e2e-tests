@@ -20,8 +20,8 @@ pipeline {
         MAVEN_OPTS = '-Dmaven.repo.local=m2-repo'
         MAVEN_USER_HOME = '.m2'  // Pour que le wrapper télécharge Maven dans le workspace
 
-        // Playwright
-        PLAYWRIGHT_BROWSERS_PATH = '.playwright-browsers'
+        // Playwright - image Docker avec navigateurs et dépendances pré-installés
+        PLAYWRIGHT_IMAGE = 'mcr.microsoft.com/playwright/java:v1.41.0-jammy'
 
         // Container Registry
         DOCKER_REGISTRY = 'nexus-docker-fastdeploy.api.paris.mdp'
@@ -174,16 +174,6 @@ pipeline {
                     }
                 }
 
-                stage('Install Playwright Browsers') {
-                    when {
-                        // Skip sur le contrôleur - sera fait sur l'agent Podman
-                        expression { false }
-                    }
-                    steps {
-                        echo '=== Installation des navigateurs Playwright (skipped - fait sur agent) ==='
-                    }
-                }
-
                 stage('Stash Artifacts') {
                     steps {
                         echo '=== Préparation des artefacts pour l\'agent Podman ==='
@@ -247,61 +237,19 @@ pipeline {
                     }
                 }
 
-                stage('Pull Lutece Image') {
-                    when {
-                        expression { params.TEST_MODE == 'TESTCONTAINERS' }
-                    }
+                stage('Pull Images') {
                     steps {
-                        echo "=== Pull de l'image: ${params.LUTECE_IMAGE} ==="
-                        sh """
-                            podman pull ${params.LUTECE_IMAGE}
-                            echo "Image téléchargée:"
-                            podman images | grep -E "site-deontologie|lutece" | head -5
-                        """
-                    }
-                }
+                        echo "=== Pull des images Docker ==="
+                        // Pull de l'image Playwright (navigateurs + dépendances pré-installés)
+                        sh "podman pull ${PLAYWRIGHT_IMAGE}"
 
-                stage('Install Playwright Browsers on Agent') {
-                    steps {
-                        echo '=== Installation des navigateurs Playwright sur l\'agent Podman ==='
-                        sh '''
-                            export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java))))
-                            export PLAYWRIGHT_BROWSERS_PATH=${WORKSPACE}/.playwright-browsers
-
-                            # Vérifier les dépendances système
-                            echo "=== Vérification des dépendances Playwright ==="
-                            MISSING_DEPS=""
-                            for lib in libnss3.so libnspr4.so libatk-1.0.so.0 libdrm.so.2 libxkbcommon.so.0; do
-                                if ! ldconfig -p 2>/dev/null | grep -q "$lib"; then
-                                    MISSING_DEPS="$MISSING_DEPS $lib"
-                                fi
-                            done
-
-                            if [ -n "$MISSING_DEPS" ]; then
-                                echo "ATTENTION: Dépendances manquantes détectées:$MISSING_DEPS"
-                                echo "Tentative d'installation avec --with-deps (nécessite sudo)..."
-                                ./mvnw exec:java -o \
-                                    -Dmaven.repo.local=m2-repo \
-                                    -Dexec.mainClass=com.microsoft.playwright.CLI \
-                                    -Dexec.args="install --with-deps chromium" \
-                                    -B || {
-                                    echo "ERREUR: Impossible d'installer les dépendances automatiquement."
-                                    echo "L'agent Jenkins doit avoir les packages suivants installés:"
-                                    echo "  libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2"
-                                    echo "  libdrm2 libxcb1 libxkbcommon0 libatspi2.0-0 libx11-6"
-                                    echo "  libxcomposite1 libxdamage1 libxext6 libxfixes3 libxrandr2"
-                                    echo "  libgbm1 libpango-1.0-0 libcairo2 libasound2"
-                                    exit 1
-                                }
-                            else
-                                echo "Dépendances système OK"
-                                ./mvnw exec:java -o \
-                                    -Dmaven.repo.local=m2-repo \
-                                    -Dexec.mainClass=com.microsoft.playwright.CLI \
-                                    -Dexec.args="install chromium" \
-                                    -B
-                            fi
-                        '''
+                        script {
+                            if (params.TEST_MODE == 'TESTCONTAINERS') {
+                                echo "Pull de l'image Lutece: ${params.LUTECE_IMAGE}"
+                                sh "podman pull ${params.LUTECE_IMAGE}"
+                            }
+                        }
+                        sh 'echo "Images disponibles:" && podman images | head -10'
                     }
                 }
 
@@ -318,6 +266,7 @@ pipeline {
                         ║  Context Root : ${LUTECE_CONTEXT_ROOT}
                         ║  Port HTTP    : ${LUTECE_HTTP_PORT}
                         ║  Test Suite   : ${params.TEST_SUITE}
+                        ║  Playwright   : ${PLAYWRIGHT_IMAGE}
                         ╚══════════════════════════════════════════════════════════════╝
                         """
 
@@ -332,30 +281,32 @@ pipeline {
 
                             sh 'mkdir -p target/screenshots'
 
-                            // Détecter le socket Podman dynamiquement et configurer Testcontainers
+                            // Exécuter les tests dans le conteneur Playwright
+                            // Le conteneur a Chromium + toutes les dépendances système pré-installées
                             sh """
-                                export JAVA_HOME=\$(dirname \$(dirname \$(readlink -f \$(which java))))
-                                export PLAYWRIGHT_BROWSERS_PATH=\${WORKSPACE}/.playwright-browsers
-
-                                # Détecter le socket Podman
                                 PODMAN_SOCKET=\$(podman info --format '{{.Host.RemoteSocket.Path}}')
                                 echo "Socket Podman détecté: \$PODMAN_SOCKET"
 
-                                # Configurer Testcontainers pour Podman
-                                export DOCKER_HOST="unix://\$PODMAN_SOCKET"
-                                export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE="\$PODMAN_SOCKET"
-                                export TESTCONTAINERS_RYUK_DISABLED=true
-
-                                ./mvnw test -o \
-                                    -Dmaven.repo.local=m2-repo \
-                                    -Dtest=${testClass} \
-                                    -Dlutece.image=${params.LUTECE_IMAGE} \
-                                    -Dlutece.context.root=${LUTECE_CONTEXT_ROOT} \
-                                    -Dlutece.http.port=${LUTECE_HTTP_PORT} \
-                                    -Dtest.headless=${params.HEADLESS} \
-                                    -Dtest.timeout=30000 \
-                                    -B \
-                                    --fail-at-end
+                                podman run --rm \
+                                    --network=host \
+                                    --user root \
+                                    -v \${WORKSPACE}:/work:Z \
+                                    -v \$PODMAN_SOCKET:/var/run/docker.sock \
+                                    -w /work \
+                                    -e DOCKER_HOST=unix:///var/run/docker.sock \
+                                    -e TESTCONTAINERS_RYUK_DISABLED=true \
+                                    -e TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock \
+                                    ${PLAYWRIGHT_IMAGE} \
+                                    ./mvnw test -o \
+                                        -Dmaven.repo.local=m2-repo \
+                                        -Dtest=${testClass} \
+                                        -Dlutece.image=${params.LUTECE_IMAGE} \
+                                        -Dlutece.context.root=${LUTECE_CONTEXT_ROOT} \
+                                        -Dlutece.http.port=${LUTECE_HTTP_PORT} \
+                                        -Dtest.headless=${params.HEADLESS} \
+                                        -Dtest.timeout=30000 \
+                                        -B \
+                                        --fail-at-end
                             """
                         }
                     }
@@ -380,6 +331,7 @@ pipeline {
                         ╠══════════════════════════════════════════════════════════════╣
                         ║  URL         : ${env.TARGET_URL}
                         ║  Test Suite  : ${params.TEST_SUITE}
+                        ║  Playwright  : ${PLAYWRIGHT_IMAGE}
                         ╚══════════════════════════════════════════════════════════════╝
                         """
 
@@ -394,18 +346,22 @@ pipeline {
 
                             sh 'mkdir -p target/screenshots'
 
+                            // Exécuter les tests dans le conteneur Playwright
                             sh """
-                                export JAVA_HOME=\$(dirname \$(dirname \$(readlink -f \$(which java))))
-                                export PLAYWRIGHT_BROWSERS_PATH=\${WORKSPACE}/.playwright-browsers
-
-                                ./mvnw test -o \
-                                    -Dmaven.repo.local=m2-repo \
-                                    -Dtest=${testClass} \
-                                    -Dlutece.base.url=${env.TARGET_URL} \
-                                    -Dtest.headless=${params.HEADLESS} \
-                                    -Dtest.timeout=10000 \
-                                    -B \
-                                    --fail-at-end
+                                podman run --rm \
+                                    --network=host \
+                                    --user root \
+                                    -v \${WORKSPACE}:/work:Z \
+                                    -w /work \
+                                    ${PLAYWRIGHT_IMAGE} \
+                                    ./mvnw test -o \
+                                        -Dmaven.repo.local=m2-repo \
+                                        -Dtest=${testClass} \
+                                        -Dlutece.base.url=${env.TARGET_URL} \
+                                        -Dtest.headless=${params.HEADLESS} \
+                                        -Dtest.timeout=10000 \
+                                        -B \
+                                        --fail-at-end
                             """
                         }
                     }
